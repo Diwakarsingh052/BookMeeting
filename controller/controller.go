@@ -4,7 +4,6 @@ import (
 	"BookMeeting/model"
 	"encoding/json"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -28,8 +27,11 @@ func (u *Users) Delete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
 	json.Unmarshal(b, &m)
+
 	var DateData []string
+
 	if strings.Contains(m.Date, "-") {
 		DateData = ExtractDate(m.Date, "-")
 	} else if strings.Contains(m.Date, "/") {
@@ -38,28 +40,36 @@ func (u *Users) Delete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "enter date in valid format", http.StatusBadRequest)
 		return
 	}
-	log.Println(len(DateData))
+
 	if len(DateData) < 3 {
 		http.Error(w, "enter date in valid format", http.StatusBadRequest)
 		return
 	}
+
 	dateS, monthS, yearS := DateData[0], DateData[1], DateData[2]
 	year, err := ValidateYear(yearS)
+
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
 	month, err := ValidateMonth(monthS, year)
+
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
 	date, err := ValidateDate(dateS, month, year)
+
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
 	var startTime []string
+
 	if strings.Contains(m.StartTime, ":") {
 		startTime = strings.Split(m.StartTime, ":")
 	} else {
@@ -67,10 +77,12 @@ func (u *Users) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	hour, minute, err := ValidateStartTime(startTime, date, month, year)
+
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
 	mInfoStart := model.MeetingInfo{
 		Date:   date,
 		Month:  month,
@@ -83,16 +95,14 @@ func (u *Users) Delete(w http.ResponseWriter, r *http.Request) {
 		Email:     m.Email,
 		StartTime: time.Date(mInfoStart.Year, time.Month(mInfoStart.Month), mInfoStart.Date, mInfoStart.Hour, mInfoStart.Minute, 0, 0, time.Local),
 	}
-	err = u.us.DB.Where("start_time=? And email=?", t1.StartTime, t1.Email).Find(&t1).Error
+
+	err = u.us.DeleteSlot(t1)
+
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	err = u.us.DB.Where("start_time=? And email=?", t1.StartTime, t1.Email).Delete(&t1).Error
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
+
 	w.Write([]byte("Successfully Deleted"))
 }
 
@@ -105,9 +115,11 @@ func (u *Users) BookSLot(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
 	json.Unmarshal(b, &m)
-	log.Println(m)
+
 	var DateData []string
+
 	if strings.Contains(m.Date, "-") {
 		DateData = ExtractDate(m.Date, "-")
 	} else if strings.Contains(m.Date, "/") {
@@ -116,27 +128,32 @@ func (u *Users) BookSLot(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "enter date in valid format", http.StatusBadRequest)
 		return
 	}
-	log.Println(len(DateData))
+
 	if len(DateData) < 3 {
 		http.Error(w, "enter date in valid format", http.StatusBadRequest)
 		return
 	}
+
 	dateS, monthS, yearS := DateData[0], DateData[1], DateData[2]
 	year, err := ValidateYear(yearS)
+
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
 	month, err := ValidateMonth(monthS, year)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
 	date, err := ValidateDate(dateS, month, year)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
 	var startTime []string
 	if strings.Contains(m.StartTime, ":") {
 		startTime = strings.Split(m.StartTime, ":")
@@ -145,10 +162,12 @@ func (u *Users) BookSLot(w http.ResponseWriter, r *http.Request) {
 	}
 
 	hour, minute, err := ValidateStartTime(startTime, date, month, year)
+
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
 	mInfoStart := model.MeetingInfo{
 		Date:   date,
 		Month:  month,
@@ -156,21 +175,25 @@ func (u *Users) BookSLot(w http.ResponseWriter, r *http.Request) {
 		Hour:   hour,
 		Minute: minute,
 	}
+
 	mInfoEnd, err := CalculateMeetingEnd(m.Duration, mInfoStart)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
 	t1 := model.User{
 		Email:     m.Email,
 		StartTime: time.Date(mInfoStart.Year, time.Month(mInfoStart.Month), mInfoStart.Date, mInfoStart.Hour, mInfoStart.Minute, 0, 0, time.Local),
 		EndTime:   time.Date(mInfoEnd.Year, time.Month(mInfoEnd.Month), mInfoEnd.Date, mInfoEnd.Hour, mInfoEnd.Minute, 0, 0, time.Local),
 	}
-	err = u.BookMeeting(t1)
+
+	err = u.us.BookMeeting(t1)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
 	w.Write([]byte("Success"))
 
 }
@@ -183,7 +206,9 @@ func (u *Users) AllBookings(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
+
 	j, err := json.MarshalIndent(&user, "", "\t")
+
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
